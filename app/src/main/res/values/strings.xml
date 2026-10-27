@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Standby Optical Scanner</string>
+    <string name="camera_permission_required">Kameratillstånd krävs för att skanna optiska ljussignaler.</string>
+    <string name="grant_permission">Tillåt kamera</string>
+</resources>
