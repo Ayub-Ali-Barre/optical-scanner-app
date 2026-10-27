@@ -1,6 +1,6 @@
-# Standby Optical Scanner (Android Prototyp)
+# Optical Scanner (Android Prototyp)
 
-En bare-bones Android-prototyp i Kotlin och Jetpack Compose med CameraX för optisk signalavläsning och Standby-inspirerad UI-design.
+En bare-bones Android-prototyp i Kotlin och Jetpack Compose med CameraX för optisk signalavläsning och anpassad UI-design.
 
 ---
 
@@ -20,8 +20,9 @@ Eftersom du inte har en fysisk Android-telefon körs allt i en **virtuell Pixel-
 1. Öppna mappen `C:\Users\ayuba\Desktop\optical-scanner-app` i VS Code (eller vanlig PowerShell).
 2. Kör skriptet:
    ```powershell
-   .\run_app.ps1
+   .\run_app.bat
    ```
+   *(eller `powershell -ExecutionPolicy Bypass -File .\run_app.ps1`)*
 3. Skriptet:
    - Startar automatiskt den virtuella telefonen `Pixel_Scanner` i ett fönster på datorn.
    - Kopplar din dators webbkamera till telefonens bakkamera.
@@ -33,4 +34,4 @@ Eftersom du inte har en fysisk Android-telefon körs allt i en **virtuell Pixel-
 
 - `app/src/main/java/com/standby/opticalscanner/MainActivity.kt`: Huvudskärmen och kamerabehörighet.
 - `app/src/main/java/com/standby/opticalscanner/ui/CameraPreview.kt`: CameraX levande videoström.
-- `app/src/main/java/com/standby/opticalscanner/ui/StandbyBottomBar.kt`: Den Standby-blå baren med den böjda formen, knappsatsen, den upphöjda scanner-knappen `[ — ]` och uppdatera-knappen.
+- `app/src/main/java/com/standby/opticalscanner/ui/StandbyBottomBar.kt`: Den blå baren med den böjda formen, knappsatsen, den upphöjda scanner-knappen `[ — ]` och uppdatera-knappen.
