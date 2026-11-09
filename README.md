@@ -13,22 +13,6 @@ En bare-bones Android-prototyp i Kotlin och Jetpack Compose med CameraX för opt
 
 ---
 
-## Hur du kör och testar appen på datorn (Ingen fysisk mobil behövs!)
-
-Eftersom du inte har en fysisk Android-telefon körs allt i en **virtuell Pixel-telefon** direkt på din skärm:
-
-1. Öppna mappen `C:\Users\ayuba\Desktop\optical-scanner-app` i VS Code (eller vanlig PowerShell).
-2. Kör skriptet:
-   ```powershell
-   .\run_app.bat
-   ```
-   *(eller `powershell -ExecutionPolicy Bypass -File .\run_app.ps1`)*
-3. Skriptet:
-   - Startar automatiskt den virtuella telefonen `Pixel_Scanner` i ett fönster på datorn.
-   - Kopplar din dators webbkamera till telefonens bakkamera.
-   - Installerar och öppnar appen på skärmen!
-
----
 
 ## Projektstruktur
 
