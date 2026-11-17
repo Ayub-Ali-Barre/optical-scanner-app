@@ -29,6 +29,7 @@ import com.standby.opticalscanner.ui.theme.White
 
 @Composable
 fun StandbyBottomBar(
+    isScanning: Boolean = false,
     onMenuClick: () -> Unit = {},
     onScanClick: () -> Unit = {},
     onRefreshClick: () -> Unit = {},
@@ -124,16 +125,29 @@ fun StandbyBottomBar(
                 .size(78.dp)
                 .shadow(elevation = 10.dp, shape = CircleShape)
                 .clip(CircleShape)
-                .background(StandbyLightBlue)
-                .border(width = 3.dp, color = StandbyRing, shape = CircleShape),
+                .background(if (isScanning) Color(0xFF026AA7) else StandbyLightBlue)
+                .border(
+                    width = 3.dp,
+                    color = if (isScanning) White else StandbyRing,
+                    shape = CircleShape
+                ),
             contentAlignment = Alignment.Center
         ) {
             IconButton(
                 onClick = onScanClick,
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Viewfinder / Reticle Icon with center horizontal dash: [ - ]
-                Canvas(modifier = Modifier.size(36.dp)) {
+                if (isScanning) {
+                    // Stop square icon while scanning
+                    Canvas(modifier = Modifier.size(24.dp)) {
+                        drawRoundRect(
+                            color = White,
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(5.dp.toPx())
+                        )
+                    }
+                } else {
+                    // Viewfinder / Reticle Icon with center horizontal dash: [ - ]
+                    Canvas(modifier = Modifier.size(36.dp)) {
                     val s = size.width
                     val strokeW = 3.5.dp.toPx()
                     val cornerL = s * 0.28f
@@ -212,6 +226,7 @@ fun StandbyBottomBar(
                         strokeWidth = strokeW * 1.1f,
                         cap = StrokeCap.Round
                     )
+                }
                 }
             }
         }

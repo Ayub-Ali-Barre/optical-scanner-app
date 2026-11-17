@@ -20,8 +20,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.standby.opticalscanner.scanner.OpticalScanController
 import com.standby.opticalscanner.ui.CameraPreview
+import com.standby.opticalscanner.ui.ScannerOverlay
 import com.standby.opticalscanner.ui.StandbyBottomBar
+import com.standby.opticalscanner.ui.SymbolSpeedDialog
 import com.standby.opticalscanner.ui.theme.OpticalScannerTheme
 import com.standby.opticalscanner.ui.theme.StandbyBlue
 
@@ -39,6 +42,17 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen() {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val scanController = remember(scope) { OpticalScanController(scope) }
+    val scanState by scanController.uiState.collectAsState()
+    var showSpeedDialog by remember { mutableStateOf(false) }
+
+    DisposableEffect(scanController) {
+        onDispose {
+            scanController.release()
+        }
+    }
+
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -67,10 +81,22 @@ fun MainScreen() {
             .background(Color.Black)
     ) {
         if (hasCameraPermission) {
-            // 1. Live Camera Feed
-            CameraPreview(modifier = Modifier.fillMaxSize())
+            // 1. Live Camera Feed + ROI Frame Analysis
+            CameraPreview(
+                isScanning = scanState.isScanning,
+                onRoiFrame = { timestampNs, rgb, width, height ->
+                    scanController.onRoiFrame(timestampNs, rgb, width, height)
+                },
+                modifier = Modifier.fillMaxSize()
+            )
 
-            // 2. Top Header Branding (Standby logo area)
+            // 2. Centered ROI Reticle + Minimal Address/Status Overlay
+            ScannerOverlay(
+                state = scanState,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // 3. Top Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -96,15 +122,24 @@ fun MainScreen() {
                 }
             }
 
-            // 3. Standby Bottom Navigation Bar
+            // 4. Bottom Navigation Bar
             StandbyBottomBar(
+                isScanning = scanState.isScanning,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding(),
-                onMenuClick = { /* Reserverad för meny/inställningar */ },
-                onScanClick = { /* Reserverad för optisk avläsning */ },
-                onRefreshClick = { /* Reserverad för återställning */ }
+                onMenuClick = { showSpeedDialog = true },
+                onScanClick = { scanController.toggleScan() },
+                onRefreshClick = { scanController.reset() }
             )
+
+            if (showSpeedDialog) {
+                SymbolSpeedDialog(
+                    currentSymbolMs = scanState.symbolMs,
+                    onSelect = { ms -> scanController.setSymbolMs(ms) },
+                    onDismiss = { showSpeedDialog = false }
+                )
+            }
         } else {
             // Permission Request Screen
             Column(
