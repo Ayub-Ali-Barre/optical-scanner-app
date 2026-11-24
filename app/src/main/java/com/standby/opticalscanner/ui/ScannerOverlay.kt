@@ -382,10 +382,11 @@ fun ProtocolAndSpeedDialog(
                 )
 
                 currentProtocol.supportedSymbolMs.forEach { ms ->
-                    val label = if (ms == currentProtocol.defaultSymbolMs) {
-                        "$ms ms (standard)"
-                    } else {
-                        "$ms ms"
+                    val label = when {
+                        ms == 36 -> "★ 36 ms (Specialiserad 500 ms standard)"
+                        ms == 40 -> "40 ms (560 ms cykel)"
+                        ms == currentProtocol.defaultSymbolMs -> "$ms ms (standard)"
+                        else -> "$ms ms"
                     }
                     Row(
                         modifier = Modifier

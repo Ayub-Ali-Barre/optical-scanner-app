@@ -15,9 +15,9 @@ enum class OpticalProtocol(
     STANDBY_14(
         id = "standby",
         displayName = "Standby 14-slot",
-        description = "Ny standard (500 ms burst, Manchester + GLRT)",
+        description = "Specialiserad standard (500 ms burst, Manchester + GLRT)",
         defaultSymbolMs = 36,
-        supportedSymbolMs = listOf(36, 50, 71)
+        supportedSymbolMs = listOf(36, 40, 50, 71)
     ),
     LEGACY_16(
         id = "legacy",

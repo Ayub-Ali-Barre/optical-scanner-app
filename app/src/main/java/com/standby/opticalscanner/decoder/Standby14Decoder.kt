@@ -14,15 +14,15 @@ import kotlin.math.sqrt
  */
 class Standby14Decoder(
     val slotS: Double = 0.500 / 14.0, // ~0.035714 s default (35.7 ms per slot)
-    val clockTolerance: Double = 0.08,
-    val minGlr: Double = 1.75,
-    val minPersistence: Double = 0.50,
-    val minContrast: Double = 15.0,
-    val minCorrelation: Double = 0.65,
+    val clockTolerance: Double = 0.12, // ±12% rate tolerance so 36 ms and 40 ms are fully supported
+    val minGlr: Double = 1.70,
+    val minPersistence: Double = 0.45,
+    val minContrast: Double = 12.0,
+    val minCorrelation: Double = 0.60,
     val exposureS: Double? = null
 ) : IOpticalDecoder {
-    // 18 slots window covers full 14-slot period plus preamble overlap (~640 ms at 35.7 ms)
-    override val windowS: Double = 18.0 * slotS
+    // 17 slots window covers full 14-slot period plus preamble overlap (~600 ms at 35.7 ms)
+    override val windowS: Double = 17.0 * slotS
 
     private val addresses = OpticalCodebook.addresses
     private val words = OpticalCodebook.standbyWords

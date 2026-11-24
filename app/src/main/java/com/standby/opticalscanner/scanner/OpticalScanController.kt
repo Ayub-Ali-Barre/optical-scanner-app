@@ -76,7 +76,8 @@ class OpticalScanController(
     private fun createDecoder(protocol: OpticalProtocol, symbolMs: Int): IOpticalDecoder {
         return when (protocol) {
             OpticalProtocol.STANDBY_14 -> {
-                Standby14Decoder(slotS = symbolMs / 1000.0)
+                val nominalSlotS = if (symbolMs == 36) (0.500 / 14.0) else (symbolMs / 1000.0)
+                Standby14Decoder(slotS = nominalSlotS, clockTolerance = 0.12)
             }
             OpticalProtocol.LEGACY_16 -> {
                 PatternDecoder(symbolS = symbolMs / 1000.0)

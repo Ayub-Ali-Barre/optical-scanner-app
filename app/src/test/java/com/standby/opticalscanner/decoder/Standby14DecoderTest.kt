@@ -87,6 +87,24 @@ class Standby14DecoderTest {
     }
 
     @Test
+    fun decodesStandby14At40Ms() {
+        val decoder40 = Standby14Decoder(slotS = 0.040, clockTolerance = 0.12)
+        for (address in listOf(1, 3, 8, 14)) {
+            val (times, lights) = generateStandbySignal(
+                address = address,
+                slotS = 0.040,
+                fps = 60.0,
+                durationS = 0.72,
+                phaseS = 0.10,
+                exposureS = 1.0 / 60.0
+            )
+            val result = decoder40.decodeWindow(times, lights)
+            assertTrue("Expected 40ms address $address to decode, got ${result.rejectionReasons}", result.accepted)
+            assertEquals(address, result.address)
+        }
+    }
+
+    @Test
     fun decodesAt50MsAnd71MsSpeedPresets() {
         val decoder50 = Standby14Decoder(slotS = 0.050)
         val (t50, l50) = generateStandbySignal(address = 5, slotS = 0.050, fps = 30.0, durationS = 0.95, phaseS = 0.15)
