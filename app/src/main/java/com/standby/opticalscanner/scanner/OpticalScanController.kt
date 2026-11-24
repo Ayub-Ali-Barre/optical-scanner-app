@@ -1,9 +1,12 @@
 package com.standby.opticalscanner.scanner
 
 import com.standby.opticalscanner.decoder.DecodeResult
+import com.standby.opticalscanner.decoder.IOpticalDecoder
+import com.standby.opticalscanner.decoder.OpticalProtocol
 import com.standby.opticalscanner.decoder.PatternDecoder
 import com.standby.opticalscanner.decoder.PhotometryClippedException
 import com.standby.opticalscanner.decoder.RoiPhotometer
+import com.standby.opticalscanner.decoder.Standby14Decoder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -27,15 +30,14 @@ data class ScannerUiState(
     val matchedAddress: Int? = null,
     val statusHint: String? = null,
     val progress: Float = 0f,
-    val symbolMs: Int = DEFAULT_SYMBOL_MS
+    val protocol: OpticalProtocol = OpticalProtocol.STANDBY_14,
+    val symbolMs: Int = OpticalProtocol.STANDBY_14.defaultSymbolMs,
+    val latencySeconds: Double? = null,
+    val glrOrRmse: Double? = null,
+    val stabilityOrMargin: Double? = null
 ) {
     val isScanning: Boolean
         get() = phase == ScanPhase.Calibrating || phase == ScanPhase.Scanning
-
-    companion object {
-        const val DEFAULT_SYMBOL_MS = 50
-        val SUPPORTED_SYMBOL_MS = listOf(50, 100, 200)
-    }
 }
 
 /**
@@ -57,7 +59,7 @@ class OpticalScanController(
     private val lock = Any()
     private var active = false
     private var sessionId = 0L
-    private var decoder = PatternDecoder(symbolS = ScannerUiState.DEFAULT_SYMBOL_MS / 1000.0)
+    private var decoder: IOpticalDecoder = createDecoder(OpticalProtocol.STANDBY_14, OpticalProtocol.STANDBY_14.defaultSymbolMs)
     private var photometer = RoiPhotometer(calibrationS = decoder.windowS)
 
     private var firstFrameNs: Long? = null
@@ -71,11 +73,33 @@ class OpticalScanController(
 
     private var decodeJob: Job? = null
 
+    private fun createDecoder(protocol: OpticalProtocol, symbolMs: Int): IOpticalDecoder {
+        return when (protocol) {
+            OpticalProtocol.STANDBY_14 -> {
+                Standby14Decoder(slotS = symbolMs / 1000.0)
+            }
+            OpticalProtocol.LEGACY_16 -> {
+                PatternDecoder(symbolS = symbolMs / 1000.0)
+            }
+        }
+    }
+
+    fun setProtocol(protocol: OpticalProtocol) {
+        if (protocol == _uiState.value.protocol) return
+        stopInternal()
+        _uiState.value = ScannerUiState(
+            phase = ScanPhase.Idle,
+            protocol = protocol,
+            symbolMs = protocol.defaultSymbolMs
+        )
+    }
+
     fun setSymbolMs(symbolMs: Int) {
         if (symbolMs == _uiState.value.symbolMs) return
         stopInternal()
         _uiState.value = ScannerUiState(
             phase = ScanPhase.Idle,
+            protocol = _uiState.value.protocol,
             symbolMs = symbolMs
         )
     }
@@ -90,8 +114,9 @@ class OpticalScanController(
 
     fun startScan() {
         decodeJob?.cancel()
-        val symbolMs = _uiState.value.symbolMs
-        val newDecoder = PatternDecoder(symbolS = symbolMs / 1000.0)
+        val currentProtocol = _uiState.value.protocol
+        val currentSymbolMs = _uiState.value.symbolMs
+        val newDecoder = createDecoder(currentProtocol, currentSymbolMs)
         val newPhotometer = RoiPhotometer(calibrationS = newDecoder.windowS)
         val currentSession: Long
 
@@ -113,12 +138,13 @@ class OpticalScanController(
 
         _uiState.value = ScannerUiState(
             phase = ScanPhase.Calibrating,
-            symbolMs = symbolMs,
+            protocol = currentProtocol,
+            symbolMs = currentSymbolMs,
             progress = 0f
         )
 
         decodeJob = scope.launch(Dispatchers.Default) {
-            runDecodeLoop(currentSession, newDecoder, symbolMs)
+            runDecodeLoop(currentSession, newDecoder, currentProtocol, currentSymbolMs)
         }
     }
 
@@ -126,6 +152,7 @@ class OpticalScanController(
         stopInternal()
         _uiState.value = ScannerUiState(
             phase = ScanPhase.Idle,
+            protocol = _uiState.value.protocol,
             symbolMs = _uiState.value.symbolMs
         )
     }
@@ -134,6 +161,7 @@ class OpticalScanController(
         stopInternal()
         _uiState.value = ScannerUiState(
             phase = ScanPhase.Idle,
+            protocol = _uiState.value.protocol,
             symbolMs = _uiState.value.symbolMs
         )
     }
@@ -174,6 +202,7 @@ class OpticalScanController(
             _uiState.value = ScannerUiState(
                 phase = ScanPhase.Failed,
                 statusHint = clippedError,
+                protocol = _uiState.value.protocol,
                 symbolMs = _uiState.value.symbolMs
             )
         }
@@ -194,7 +223,8 @@ class OpticalScanController(
 
     private suspend fun runDecodeLoop(
         expectedSession: Long,
-        activeDecoder: PatternDecoder,
+        activeDecoder: IOpticalDecoder,
+        protocol: OpticalProtocol,
         symbolMs: Int
     ) {
         while (scope.isActive) {
@@ -235,9 +265,10 @@ class OpticalScanController(
             val progress = (wallElapsedS / MAX_SCAN_SECONDS).toFloat().coerceIn(0f, 1f)
             val currentPhase = if (calibrated) ScanPhase.Scanning else ScanPhase.Calibrating
             if (_uiState.value.phase != currentPhase || kotlin.math.abs(_uiState.value.progress - progress) >= 0.01f) {
-                _uiState.value = ScannerUiState(
+                _uiState.value = _uiState.value.copy(
                     phase = currentPhase,
                     progress = progress,
+                    protocol = protocol,
                     symbolMs = symbolMs
                 )
             }
@@ -247,18 +278,19 @@ class OpticalScanController(
             val lights = windowLights
             if (ts != null && lights != null) {
                 val result = activeDecoder.decodeWindow(ts, lights)
-                if (handleDecodeResult(expectedSession, result, symbolMs)) {
+                if (handleDecodeResult(expectedSession, result, protocol, symbolMs, wallElapsedS)) {
                     return
                 }
             }
 
             // Timeout check (10 s)
             if (wallElapsedS >= MAX_SCAN_SECONDS || latestTimeS >= MAX_SCAN_SECONDS) {
-                val finalHint = finishOnTimeout(expectedSession, activeDecoder, symbolMs, anyFrame)
+                val finalHint = finishOnTimeout(expectedSession, activeDecoder, protocol, symbolMs, anyFrame)
                 if (finalHint != null) {
                     _uiState.value = ScannerUiState(
                         phase = ScanPhase.Failed,
                         statusHint = finalHint,
+                        protocol = protocol,
                         symbolMs = symbolMs
                     )
                 }
@@ -270,7 +302,9 @@ class OpticalScanController(
     private fun handleDecodeResult(
         expectedSession: Long,
         result: DecodeResult,
-        symbolMs: Int
+        protocol: OpticalProtocol,
+        symbolMs: Int,
+        wallElapsedS: Double
     ): Boolean {
         synchronized(lock) {
             if (!active || sessionId != expectedSession) return true
@@ -280,7 +314,11 @@ class OpticalScanController(
                     phase = ScanPhase.Matched,
                     matchedAddress = result.address,
                     progress = 1f,
-                    symbolMs = symbolMs
+                    protocol = protocol,
+                    symbolMs = symbolMs,
+                    latencySeconds = wallElapsedS,
+                    glrOrRmse = if (protocol == OpticalProtocol.STANDBY_14) result.glrRatio else result.rmse,
+                    stabilityOrMargin = if (protocol == OpticalProtocol.STANDBY_14) result.persistence else result.rmseMargin
                 )
                 return true
             }
@@ -291,7 +329,8 @@ class OpticalScanController(
 
     private fun finishOnTimeout(
         expectedSession: Long,
-        activeDecoder: PatternDecoder,
+        activeDecoder: IOpticalDecoder,
+        protocol: OpticalProtocol,
         symbolMs: Int,
         anyFrame: Boolean
     ): String? {
@@ -328,11 +367,16 @@ class OpticalScanController(
         if (slice != null && slice.first.size >= 2) {
             val finalResult = activeDecoder.decodeWindow(slice.first, slice.second)
             if (finalResult.accepted && finalResult.address != null) {
+                val latencyS = (System.nanoTime() - scanStartWallNs) / 1_000_000_000.0
                 _uiState.value = ScannerUiState(
                     phase = ScanPhase.Matched,
                     matchedAddress = finalResult.address,
                     progress = 1f,
-                    symbolMs = symbolMs
+                    protocol = protocol,
+                    symbolMs = symbolMs,
+                    latencySeconds = latencyS,
+                    glrOrRmse = if (protocol == OpticalProtocol.STANDBY_14) finalResult.glrRatio else finalResult.rmse,
+                    stabilityOrMargin = if (protocol == OpticalProtocol.STANDBY_14) finalResult.persistence else finalResult.rmseMargin
                 )
                 return null
             }
@@ -374,6 +418,8 @@ class OpticalScanController(
                 "Kameran är för långsam för $symbolMs ms – prova en längre symboltid i menyn."
             "ambiguous_address" ->
                 "Tvetydig signal – håll telefonen stadigt mot en ensam lampa."
+            "insufficient_persistence" ->
+                "Signalen var inte tillräckligt stabil över hela perioden – håll telefonen stilla."
             else ->
                 "Ingen adress hittades – rikta rutan mot en blinkande lampa och försök igen."
         }

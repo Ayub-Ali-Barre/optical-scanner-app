@@ -8,7 +8,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,11 +24,12 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.standby.opticalscanner.scanner.OpticalScanController
 import com.standby.opticalscanner.ui.CameraPreview
+import com.standby.opticalscanner.ui.ProtocolAndSpeedDialog
 import com.standby.opticalscanner.ui.ScannerOverlay
 import com.standby.opticalscanner.ui.StandbyBottomBar
-import com.standby.opticalscanner.ui.SymbolSpeedDialog
 import com.standby.opticalscanner.ui.theme.OpticalScannerTheme
 import com.standby.opticalscanner.ui.theme.StandbyBlue
+import com.standby.opticalscanner.ui.theme.StandbyLightBlue
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,7 +48,7 @@ fun MainScreen() {
     val scope = rememberCoroutineScope()
     val scanController = remember(scope) { OpticalScanController(scope) }
     val scanState by scanController.uiState.collectAsState()
-    var showSpeedDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
 
     DisposableEffect(scanController) {
         onDispose {
@@ -96,15 +99,41 @@ fun MainScreen() {
                 modifier = Modifier.fillMaxSize()
             )
 
-            // 3. Top Header
+            // 3. Top Header: Protocol Chip (Left) + Standby Logo (Right)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(top = 16.dp, end = 20.dp),
-                horizontalArrangement = Arrangement.End,
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Interactive Protocol & Speed Pill
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF0F172A).copy(alpha = 0.82f),
+                    modifier = Modifier.clickable { showSettingsDialog = true }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(StandbyLightBlue, RoundedCornerShape(4.dp))
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "${scanState.protocol.displayName} (${scanState.symbolMs} ms)",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                // Brand Header
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
                         text = "STANDBY",
@@ -128,16 +157,18 @@ fun MainScreen() {
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding(),
-                onMenuClick = { showSpeedDialog = true },
+                onMenuClick = { showSettingsDialog = true },
                 onScanClick = { scanController.toggleScan() },
                 onRefreshClick = { scanController.reset() }
             )
 
-            if (showSpeedDialog) {
-                SymbolSpeedDialog(
+            if (showSettingsDialog) {
+                ProtocolAndSpeedDialog(
+                    currentProtocol = scanState.protocol,
                     currentSymbolMs = scanState.symbolMs,
-                    onSelect = { ms -> scanController.setSymbolMs(ms) },
-                    onDismiss = { showSpeedDialog = false }
+                    onSelectProtocol = { proto -> scanController.setProtocol(proto) },
+                    onSelectSymbolMs = { ms -> scanController.setSymbolMs(ms) },
+                    onDismiss = { showSettingsDialog = false }
                 )
             }
         } else {

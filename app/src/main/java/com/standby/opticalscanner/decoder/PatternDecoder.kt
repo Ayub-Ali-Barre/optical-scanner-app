@@ -13,6 +13,8 @@ data class DecodeResult(
     val rejectionReasons: List<String>,
     val rmse: Double? = null,
     val rmseMargin: Double? = null,
+    val glrRatio: Double? = null,
+    val persistence: Double? = null,
     val fittedSymbolMs: Double? = null,
     val observedFps: Double? = null,
     val contrast: Double = 0.0
@@ -31,8 +33,8 @@ class PatternDecoder(
     val minMargin: Double = 0.10,
     val minContrast: Double = 15.0,
     val exposureS: Double? = null
-) {
-    val windowS: Double = 18.0 * symbolS
+) : IOpticalDecoder {
+    override val windowS: Double = 18.0 * symbolS
 
     private val addresses = OpticalCodebook.addresses
     private val words = OpticalCodebook.words
@@ -60,7 +62,7 @@ class PatternDecoder(
         fun copy(): FitCandidate = FitCandidate(mse, rate, phase, exposure)
     }
 
-    fun decodeWindow(times: DoubleArray, brightness: DoubleArray): DecodeResult {
+    override fun decodeWindow(times: DoubleArray, brightness: DoubleArray): DecodeResult {
         require(times.size == brightness.size && times.size >= 2) {
             "At least two matching timestamps and brightness samples are required."
         }
