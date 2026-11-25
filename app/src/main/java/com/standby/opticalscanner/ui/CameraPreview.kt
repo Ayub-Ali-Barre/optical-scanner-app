@@ -120,6 +120,8 @@ fun CameraPreview(
 
                     val previewBuilder = Preview.Builder()
                     if (preferredFpsRange != null) {
+                        // Tell CameraX about the requested rate before it selects stream sizes.
+                        previewBuilder.setTargetFrameRate(preferredFpsRange)
                         Camera2Interop.Extender(previewBuilder)
                             .setCaptureRequestOption(
                                 CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
@@ -208,8 +210,15 @@ private fun findPreferredHighFpsRange(context: Context): Range<Int>? {
         val ranges = manager.getCameraCharacteristics(backCameraId)
             .get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
             ?: return null
+        // Prefer a fixed rate. A variable 15..60 range must not outrank fixed 30.
         ranges.firstOrNull { it.lower == 60 && it.upper == 60 }
-            ?: ranges.filter { it.upper >= 60 }.maxByOrNull { it.lower }
+            ?: ranges.firstOrNull { it.lower == 30 && it.upper == 30 }
+            ?: ranges.filter { it.lower <= 30 && it.upper >= 30 }
+                .sortedWith(
+                    compareByDescending<Range<Int>> { it.lower }
+                        .thenBy { it.upper }
+                )
+                .firstOrNull()
     } catch (_: Exception) {
         null
     }
